@@ -1,4 +1,21 @@
+<div align="center">
+
 # torre
+
+[![CI](https://github.com/jjuanrivvera/torre-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/jjuanrivvera/torre-cli/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/jjuanrivvera/torre-cli)](https://github.com/jjuanrivvera/torre-cli/releases/latest)
+[![Coverage](https://img.shields.io/badge/coverage-%E2%89%A580%25-brightgreen)](https://github.com/jjuanrivvera/torre-cli/actions/workflows/ci.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/jjuanrivvera/torre-cli.svg)](https://pkg.go.dev/github.com/jjuanrivvera/torre-cli)
+[![Go version](https://img.shields.io/github/go-mod/go-version/jjuanrivvera/torre-cli)](go.mod)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/jjuanrivvera/torre-cli)
+[![Built with cliwright](https://img.shields.io/badge/built_with-cliwright-1f6feb)](https://cliwright.jjuanrivvera.com)
+
+**Torre.ai jobs from your terminal — search opportunities, fetch public genomes, agent-friendly output (JSON/YAML/CSV/MCP).**
+
+[Documentation](https://jjuanrivvera.github.io/torre-cli/) · [Command reference](https://jjuanrivvera.github.io/torre-cli/commands/torre/)
+
+</div>
 
 A fast, scriptable, **agent-friendly** command-line client for the [Torre.ai](https://torre.ai)
 public API. Search job opportunities, fetch an opportunity's full detail, search people, and pull
