@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "torre-cli",
+  "version": "0.1.0",
+  "description": "Discover jobs and analyze candidate/role fit on Torre.ai — read-only, machine-first (JSON/YAML/CSV/MCP).",
+  "author": { "name": "jjuanrivvera", "url": "https://github.com/jjuanrivvera" },
+  "homepage": "https://github.com/jjuanrivvera/torre-cli",
+  "repository": "https://github.com/jjuanrivvera/torre-cli",
+  "license": "MIT",
+  "skills": "./skills",
+  "keywords": ["torre", "jobs", "recruiting", "job-search", "cli", "ai-agent"]
+}
