@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-07-18
+
 ### Added
 - Initial release of `torre`, a read-only agent-friendly CLI for the Torre.ai public API.
 - `jobs search` — search opportunities with skill/role, remote, location, organization, and
