@@ -27,8 +27,11 @@ JSON/`-o id` output plus a built-in `--jq`.
    defaults to `potential-to-develop`; other values: `1-plus-years`, `2-plus-years`,
    `3-plus-years`, `5-plus-years`.
 2. **Emit machine output** for downstream steps: `-o json`, `-o id`, or slice with `--jq`.
-3. **Filters compose:** `--skill`, `--remote`, `--location`, `--organization`,
-   `--compensation`/`--currency`/`--periodicity`; page with `--limit`/`--size`/`--all`.
+3. **Not every flag narrows results.** `--skill` narrows the search and `--since` is a hard
+   client-side date filter, but `--location` and `--compensation`/`--currency`/`--periodicity`
+   are **ranking hints** Torre applies server-side — they nudge relevance/ordering, they do NOT
+   restrict results to that location or pay (a remote role carries no location and is not
+   dropped). Page with `--limit`/`--size`/`--all`.
 5. **Results are relevance-ordered, not date-ordered** — they span years. For a job hunt,
    date-filter with `--since` (alias `--posted-after`): absolute `YYYY-MM-DD` or relative
    `Nd`/`Nw` (e.g. `7d`, `2w`). It filters `.created` client-side, so pair it with `--all` or
@@ -42,10 +45,10 @@ JSON/`-o id` output plus a built-in `--jq`.
 # 1. Discover — recent remote Go roles, as JSON
 torre jobs search --skill golang --remote --limit 20 -o json
 
-# 2. Narrow by location, organization, pay, or recency
-torre jobs search --skill "backend" --location Colombia -o json
-torre jobs search --skill go --compensation 3000 --currency 'USD$' --periodicity monthly -o json
-torre jobs search --skill go --since 7d --all -o json   # only posted in the last 7 days
+# 2. Nudge relevance by location/pay (ranking hints, NOT hard filters), or filter by recency
+torre jobs search --skill "backend" --location Colombia -o json   # location boosts ranking, not a filter
+torre jobs search --skill go --compensation 3000 --currency 'USD$' --periodicity monthly -o json  # comp boosts ranking, not a filter
+torre jobs search --skill go --since 7d --all -o json   # --since IS a hard filter: only posted in the last 7 days
 
 # 3. Inspect one opportunity
 torre jobs get <opportunity-id> -o json
@@ -59,9 +62,9 @@ torre genome <username> --jq '{name:.person.name, skills:[.strengths[].name]}'
 | Task | Command |
 |---|---|
 | Remote roles by skill | `torre jobs search --skill <skill> --remote --limit 20` |
-| By location | `torre jobs search --skill <skill> --location Colombia` |
+| Location ranking hint (not a filter) | `torre jobs search --skill <skill> --location Colombia` |
 | By organization | `torre jobs search --skill <skill> --organization <org>` |
-| Min compensation | `torre jobs search --skill <skill> --compensation 3000 --currency 'USD$'` |
+| Compensation ranking hint (not a filter) | `torre jobs search --skill <skill> --compensation 3000 --currency 'USD$'` |
 | Recently posted | `torre jobs search --skill <skill> --since 7d --all` (or `--posted-after 2026-07-12`) |
 | One opportunity | `torre jobs get <id> -o json` |
 | Just ids | `torre jobs search --skill <skill> -o id` |
@@ -70,7 +73,8 @@ torre genome <username> --jq '{name:.person.name, skills:[.strengths[].name]}'
 | See the request | `torre jobs search --skill go --dry-run` |
 
 ## Troubleshooting
-- **Empty results for a skill:** you likely omitted `--experience` context — the default is
-  applied automatically, but a very narrow `--location`/`--compensation` can zero out results.
+- **Empty results for a skill:** check the `--skill`/`--experience` text — those narrow the
+  search. `--location`/`--compensation` are ranking hints, not filters, so they won't zero out
+  results (add `--since` if you need a hard date cutoff).
 - **Genome too big:** slice it with `--jq` rather than dumping the whole object.
 - **Connectivity:** `torre doctor` checks config, both hosts, and a live request.

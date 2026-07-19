@@ -86,6 +86,21 @@ OpenAPI/llms.txt/Postman collection, so the surface was enumerated by request).
     `professionalHeadline`, `verified`, `weight`, … but no timestamp), so a date filter is
     inapplicable there.
 
+## Location / compensation are boosts, not hard filters
+
+16. **`--location` and `--compensation` are RANKING HINTS, not filters** → the opportunities
+    `_search` endpoint accepts the `location`/`compensation` clauses but treats them as
+    relevance/ranking boosts, NOT hard filters — the result set is not restricted to that
+    location or pay. Why: verified live 2026-07-19 that `--skill go` (40 results),
+    `--skill go --location Colombia` (40) and `--skill go --compensation 4000` (40) all return
+    identical counts, and remote opportunities carry an empty `locations` array. The flags are
+    KEPT (they usefully nudge server-side ordering) but the help text, README and SKILL now say
+    "ranking hint, not a hard filter" so a user isn't misled into thinking `--location Colombia`
+    restricts results. **Client-side filtering was considered and REJECTED**: remote opps have
+    an empty `locations` array (a client location filter would drop every remote result) and
+    compensation is frequently unset/"to-be-agreed" (would drop most results). Contrast with
+    `--since` (#13), which IS an honest hard client-side filter over `.created`.
+
 ## Completeness
 
 - `api_method_total = 4` is the full enumerated public unauthenticated surface (see

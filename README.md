@@ -82,11 +82,16 @@ torre people search --skill "data science" --remote -o table
 | `--skill` / `--query` | skill or role text |
 | `--experience` | experience level (default `potential-to-develop`; Torre's seniority proxy — e.g. `1-plus-years`, `3-plus-years`) |
 | `--remote` | only remote opportunities |
-| `--location` | location/country (e.g. `Colombia`) |
+| `--location` | location/country ranking hint (e.g. `Colombia`) — server-side relevance nudge, **not** a hard filter |
 | `--organization` | organization name |
-| `--compensation` `--currency` `--periodicity` | minimum compensation (currency default `USD$`, periodicity default `monthly`) |
+| `--compensation` `--currency` `--periodicity` | compensation ranking hint (currency default `USD$`, periodicity default `monthly`) — server-side relevance nudge, **not** a hard filter |
 | `--since` / `--posted-after` | keep only roles created on/after a date — absolute `YYYY-MM-DD` or relative `Nd`/`Nw` (e.g. `7d`, `2w`). Client-side over `.created`; pairs well with `--all`/a larger `--limit` |
 | `--size` `--limit` `--all` | pagination |
+
+> Note: `--location` and `--compensation` are **ranking hints** Torre applies server-side — they
+> influence relevance/ordering but do NOT restrict results to that location or pay (a remote role
+> carries no location and is not dropped). Only `--skill` narrows the search and `--since` is a
+> hard (client-side) filter.
 
 ## Output & scripting
 

@@ -41,6 +41,12 @@ func newJobsSearchCmd(d *deps) *cobra.Command {
 compensation filters. Results paginate with --size/--limit/--all. Machine output
 (-o json/-o id/--jq) is the primary interface for an assistant; -o table is the human view.
 
+Not every flag narrows the result set. --skill (and --experience) narrows the search, and
+--since (alias --posted-after) is a hard client-side date filter. But --location and
+--compensation (with --currency/--periodicity) are RANKING HINTS Torre applies server-side:
+they nudge relevance/ordering, they do NOT restrict results to that location or pay. A remote
+role, for example, carries no location and is not dropped by --location.
+
 A skill search needs an experience level (Torre rejects a bare skill); --experience defaults
 to "potential-to-develop" and accepts Torre's levels such as "1-plus-years",
 "2-plus-years", "3-plus-years", "5-plus-years".
@@ -92,11 +98,11 @@ pair --since with --all or a larger --limit; when neither is set --since widens 
 	_ = fl.MarkHidden("query")
 	fl.StringVar(&f.Experience, "experience", "", "required experience level (default potential-to-develop)")
 	fl.BoolVar(&f.Remote, "remote", false, "only remote opportunities")
-	fl.StringVar(&f.Location, "location", "", "location/country to match (e.g. Colombia)")
+	fl.StringVar(&f.Location, "location", "", "location/country ranking hint applied server-side (nudges relevance/ordering; does NOT restrict results — unlike --since)")
 	fl.StringVar(&f.Organization, "organization", "", "organization name to match")
-	fl.Float64Var(&f.Compensation, "compensation", 0, "minimum compensation amount")
-	fl.StringVar(&f.Currency, "currency", "", `compensation currency (default "USD$")`)
-	fl.StringVar(&f.Periodicity, "periodicity", "", "compensation periodicity: hourly|monthly|yearly (default monthly)")
+	fl.Float64Var(&f.Compensation, "compensation", 0, "compensation ranking hint applied server-side (nudges relevance/ordering; does NOT restrict results)")
+	fl.StringVar(&f.Currency, "currency", "", `currency for the --compensation ranking hint (default "USD$")`)
+	fl.StringVar(&f.Periodicity, "periodicity", "", "periodicity for the --compensation ranking hint: hourly|monthly|yearly (default monthly)")
 	fl.StringVar(&since, "since", "", "keep only opportunities created on/after this date: absolute YYYY-MM-DD or relative Nd/Nw (e.g. 7d, 2w)")
 	fl.StringVar(&since, "posted-after", "", "alias for --since")
 	_ = fl.MarkHidden("posted-after")
