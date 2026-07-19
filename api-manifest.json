@@ -1,0 +1,41 @@
+{
+  "api": "Torre.ai (public API)",
+  "binary": "torre",
+  "base_url": "https://torre.ai/api",
+  "search_base_url": "https://search.torre.co",
+  "docs_url": "https://torre.ai",
+  "profile_flag": "profile",
+  "profile_noun": "profile",
+  "api_method_total": 4,
+  "api_method_source": "Torre public API endpoint recon by live probe (2026-07-18): Torre publishes no official OpenAPI/llms.txt, so the complete public unauthenticated surface was enumerated by request — the search-cluster _search endpoints and the app-API genome/opportunity endpoints. See DECISIONS.md.",
+  "enumerated_endpoints": [
+    "POST https://search.torre.co/opportunities/_search/",
+    "GET  https://torre.ai/api/suite/opportunities/{id}",
+    "POST https://search.torre.co/people/_search",
+    "GET  https://torre.ai/api/genome/bios/{username}"
+  ],
+  "methods": ["genome"],
+  "resources": [
+    {
+      "name": "jobs",
+      "endpoints": ["POST /opportunities/_search/", "GET /suite/opportunities/{id}"],
+      "verbs": ["search", "get"],
+      "read_only": true,
+      "fields": ["id", "objective", "tagline", "opportunity", "type", "status", "remote", "commitment", "locations", "compensation", "organizations", "skills", "slug", "created"]
+    },
+    {
+      "name": "people",
+      "endpoints": ["POST /people/_search"],
+      "verbs": ["search"],
+      "read_only": true,
+      "fields": ["ggId", "name", "username", "professionalHeadline", "verified", "picture", "locationName"]
+    },
+    {
+      "name": "genome",
+      "endpoints": ["GET /genome/bios/{username}"],
+      "verbs": [],
+      "read_only": true,
+      "fields": ["person", "strengths", "experiences", "education", "languages", "interests", "stats"]
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+## torre mcp claude
+
+Manage Claude Desktop MCP servers
+
+### Synopsis
+
+Manage MCP server configuration for Claude Desktop
+
+### Options
+
+```
+  -h, --help   help for claude
+```
+
+### Options inherited from parent commands
+
+```
+      --all                      page through all results (search commands)
+      --base-url string          override the Torre app-API host (default https://torre.ai/api)
+      --columns strings          comma-separated columns to show
+      --dry-run                  print the equivalent curl and make no request
+      --jq string                gojq expression applied to the response before rendering
+      --limit int                max items to return across pages (search commands)
+      --no-color                 disable colored output
+  -o, --output string            output format: table|json|yaml|csv|id
+      --profile string           named profile to use
+      --quiet                    suppress non-essential chatter
+      --search-base-url string   override the Torre search host (default https://search.torre.co)
+      --show-token               reveal the bearer token in dry-run output
+      --size int                 results per page (search commands) (default 20)
+  -v, --verbose                  verbose request logging (stderr)
+```
+
+### SEE ALSO
+
+* [torre mcp](torre_mcp.md)	 - MCP server management
+* [torre mcp claude disable](torre_mcp_claude_disable.md)	 - Remove server from Claude config
+* [torre mcp claude enable](torre_mcp_claude_enable.md)	 - Add server to Claude config
+* [torre mcp claude list](torre_mcp_claude_list.md)	 - Show Claude MCP servers
+

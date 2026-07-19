@@ -1,0 +1,20 @@
+site_name: torre
+site_description: A fast, scriptable, agent-friendly CLI for the Torre.ai jobs API
+site_url: https://jjuanrivvera.github.io/torre-cli/
+repo_url: https://github.com/jjuanrivvera/torre-cli
+repo_name: jjuanrivvera/torre-cli
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      toggle: { icon: material/brightness-7, name: Dark mode }
+    - scheme: slate
+      primary: indigo
+      toggle: { icon: material/brightness-4, name: Light mode }
+  features: [navigation.sections, content.code.copy]
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Command reference: commands/torre.md
+markdown_extensions: [admonition, pymdownx.superfences, pymdownx.highlight]
