@@ -12,6 +12,11 @@ A skill search needs an experience level (Torre rejects a bare skill); --experie
 to "potential-to-develop" and accepts Torre's levels such as "1-plus-years",
 "2-plus-years", "3-plus-years", "5-plus-years".
 
+Results come back ordered by RELEVANCE, not date, and span years. --since (alias
+--posted-after) drops anything older than a threshold — an absolute YYYY-MM-DD or a relative
+Nd/Nw (last N days/weeks). Because recent items are sparse in a small relevance-ordered page,
+pair --since with --all or a larger --limit; when neither is set --since widens the scan.
+
 ```
 torre jobs search [flags]
 ```
@@ -21,8 +26,9 @@ torre jobs search [flags]
 ```
   torre jobs search --skill golang --remote
   torre jobs search --skill "product design" --location Colombia --limit 50 -o json
+  torre jobs search --skill go --since 7d --remote -o json
+  torre jobs search --skill go --posted-after 2026-07-12 --all -o id
   torre jobs search --skill go --compensation 3000 --currency 'USD$' --periodicity monthly
-  torre jobs search --skill go --remote -o id | head
 ```
 
 ### Options
@@ -36,6 +42,7 @@ torre jobs search [flags]
       --organization string   organization name to match
       --periodicity string    compensation periodicity: hourly|monthly|yearly (default monthly)
       --remote                only remote opportunities
+      --since string          keep only opportunities created on/after this date: absolute YYYY-MM-DD or relative Nd/Nw (e.g. 7d, 2w)
       --skill string          skill or role text to match
 ```
 

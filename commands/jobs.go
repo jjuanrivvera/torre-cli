@@ -2,6 +2,7 @@ package commands
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -10,6 +11,12 @@ import (
 
 // jobsColumns are the default table columns for a search result list.
 var jobsColumns = []string{"id", "objective", "opportunity", "remote", "status", "locations"}
+
+// sinceDefaultScan is how many results --since scans when a date is pinned but no explicit
+// --limit is given and --all is off. Torre orders by relevance, not date, so recent items
+// are sparse in a small page; a wider scan surfaces them without an unbounded --all
+// (DECISIONS.md).
+const sinceDefaultScan = 100
 
 func init() {
 	registrars = append(registrars, func(d *deps) *cobra.Command {
@@ -26,6 +33,7 @@ func init() {
 
 func newJobsSearchCmd(d *deps) *cobra.Command {
 	var f api.SearchFilters
+	var since string
 	cmd := &cobra.Command{
 		Use:   "search",
 		Short: "Search job opportunities",
@@ -35,23 +43,45 @@ compensation filters. Results paginate with --size/--limit/--all. Machine output
 
 A skill search needs an experience level (Torre rejects a bare skill); --experience defaults
 to "potential-to-develop" and accepts Torre's levels such as "1-plus-years",
-"2-plus-years", "3-plus-years", "5-plus-years".`,
+"2-plus-years", "3-plus-years", "5-plus-years".
+
+Results come back ordered by RELEVANCE, not date, and span years. --since (alias
+--posted-after) drops anything older than a threshold — an absolute YYYY-MM-DD or a relative
+Nd/Nw (last N days/weeks). Because recent items are sparse in a small relevance-ordered page,
+pair --since with --all or a larger --limit; when neither is set --since widens the scan.`,
 		Example: `  torre jobs search --skill golang --remote
   torre jobs search --skill "product design" --location Colombia --limit 50 -o json
-  torre jobs search --skill go --compensation 3000 --currency 'USD$' --periodicity monthly
-  torre jobs search --skill go --remote -o id | head`,
+  torre jobs search --skill go --since 7d --remote -o json
+  torre jobs search --skill go --posted-after 2026-07-12 --all -o id
+  torre jobs search --skill go --compensation 3000 --currency 'USD$' --periodicity monthly`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			c, _, err := d.getAPIClient()
 			if err != nil {
 				return err
 			}
-			results, err := c.SearchOpportunitiesAll(cmd.Context(), f, d.gf.size, d.gf.limit, d.gf.all)
+			size, limit := d.gf.size, d.gf.limit
+			var threshold time.Time
+			if since != "" {
+				threshold, err = api.ParseSince(since, time.Now())
+				if err != nil {
+					return err
+				}
+				// Relevance-ordered results bury recent items; widen the scan when a date
+				// is pinned but the user gave no explicit --limit and didn't ask for --all.
+				if !cmd.Flags().Changed("limit") && !d.gf.all {
+					limit = sinceDefaultScan
+				}
+			}
+			results, err := c.SearchOpportunitiesAll(cmd.Context(), f, size, limit, d.gf.all)
 			if err != nil {
 				return err
 			}
 			if results == nil { // dry-run
 				return nil
+			}
+			if since != "" {
+				results = api.FilterByCreated(results, threshold)
 			}
 			return d.render(cmd, marshalList(results), jobsColumns)
 		},
@@ -67,6 +97,9 @@ to "potential-to-develop" and accepts Torre's levels such as "1-plus-years",
 	fl.Float64Var(&f.Compensation, "compensation", 0, "minimum compensation amount")
 	fl.StringVar(&f.Currency, "currency", "", `compensation currency (default "USD$")`)
 	fl.StringVar(&f.Periodicity, "periodicity", "", "compensation periodicity: hourly|monthly|yearly (default monthly)")
+	fl.StringVar(&since, "since", "", "keep only opportunities created on/after this date: absolute YYYY-MM-DD or relative Nd/Nw (e.g. 7d, 2w)")
+	fl.StringVar(&since, "posted-after", "", "alias for --since")
+	_ = fl.MarkHidden("posted-after")
 	return annotate(cmd, kindRead)
 }
 

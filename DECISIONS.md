@@ -64,6 +64,28 @@ OpenAPI/llms.txt/Postman collection, so the surface was enumerated by request).
 - CSV: **kept** — search results are tabular enough to be useful; genome is not, so it renders
   best as json/yaml.
 
+## Posting-date filter (`--since`)
+
+13. **Date filtering is CLIENT-SIDE, not server-side** → `jobs search --since`/`--posted-after`
+    filters the fetched result set on each opportunity's `.created` field; the search body is
+    unchanged. Why: verified live 2026-07-19 that the opportunities `_search` endpoint has no
+    documented date clause and **silently ignores** one — probing `{"and":[{"created":{"from":
+    "2026-07-01"}}]}`, `{"created":{"gte":...}}`, `{"created":{"term":{"gte":...}}}` and
+    `{"date":{"from":...}}` all returned the same full `total` (266040) as an empty body, i.e.
+    no filtering happened. Results are ordered by RELEVANCE, not date, and span 2021→today, so a
+    client-side pass over `.created` (RFC 3339, e.g. `2025-04-30T16:42:17.000Z`) is the only
+    reliable date filter. If Torre later ships a real created clause, prefer server-side and
+    revise this note.
+14. **`--since` widens the scan when no explicit `--limit`/`--all`** → because relevance ordering
+    buries recent items in a small page, pinning `--since` without an explicit `--limit` and
+    without `--all` bumps the fetch to `sinceDefaultScan` (100). Why: a default single page of 20
+    relevance-ranked results often contains zero recent items; scanning more finds them without
+    forcing an unbounded `--all`. Documented on the flag and in the README/SKILL cheatsheets.
+15. **`--since` scopes to `jobs search` only** → people results carry no comparable created/date
+    field (verified 2026-07-19: a people `_search` result exposes `ggId`, `name`, `username`,
+    `professionalHeadline`, `verified`, `weight`, … but no timestamp), so a date filter is
+    inapplicable there.
+
 ## Completeness
 
 - `api_method_total = 4` is the full enumerated public unauthenticated surface (see

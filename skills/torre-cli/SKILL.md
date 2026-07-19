@@ -29,6 +29,10 @@ JSON/`-o id` output plus a built-in `--jq`.
 2. **Emit machine output** for downstream steps: `-o json`, `-o id`, or slice with `--jq`.
 3. **Filters compose:** `--skill`, `--remote`, `--location`, `--organization`,
    `--compensation`/`--currency`/`--periodicity`; page with `--limit`/`--size`/`--all`.
+5. **Results are relevance-ordered, not date-ordered** — they span years. For a job hunt,
+   date-filter with `--since` (alias `--posted-after`): absolute `YYYY-MM-DD` or relative
+   `Nd`/`Nw` (e.g. `7d`, `2w`). It filters `.created` client-side, so pair it with `--all` or
+   a larger `--limit` to scan enough candidates.
 4. **`genome` is large** — always `--jq` or `-o json` a slice; it's ideal for computing a
    candidate/role match against a profile.
 
@@ -38,9 +42,10 @@ JSON/`-o id` output plus a built-in `--jq`.
 # 1. Discover — recent remote Go roles, as JSON
 torre jobs search --skill golang --remote --limit 20 -o json
 
-# 2. Narrow by location, organization, or pay
+# 2. Narrow by location, organization, pay, or recency
 torre jobs search --skill "backend" --location Colombia -o json
 torre jobs search --skill go --compensation 3000 --currency 'USD$' --periodicity monthly -o json
+torre jobs search --skill go --since 7d --all -o json   # only posted in the last 7 days
 
 # 3. Inspect one opportunity
 torre jobs get <opportunity-id> -o json
@@ -57,6 +62,7 @@ torre genome <username> --jq '{name:.person.name, skills:[.strengths[].name]}'
 | By location | `torre jobs search --skill <skill> --location Colombia` |
 | By organization | `torre jobs search --skill <skill> --organization <org>` |
 | Min compensation | `torre jobs search --skill <skill> --compensation 3000 --currency 'USD$'` |
+| Recently posted | `torre jobs search --skill <skill> --since 7d --all` (or `--posted-after 2026-07-12`) |
 | One opportunity | `torre jobs get <id> -o json` |
 | Just ids | `torre jobs search --skill <skill> -o id` |
 | Person's genome | `torre genome <username> -o json` |

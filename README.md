@@ -60,6 +60,10 @@ torre jobs search --skill golang --remote -o json
 # LATAM + remote, capped and piped
 torre jobs search --skill "product design" --location Colombia --limit 50 -o id
 
+# Only recently-posted roles (results are relevance-ordered, not date-ordered)
+torre jobs search --skill golang --since 7d --all -o json
+torre jobs search --skill golang --posted-after 2026-07-12 -o json
+
 # One opportunity's full detail
 torre jobs get KWN4QjAd
 
@@ -81,6 +85,7 @@ torre people search --skill "data science" --remote -o table
 | `--location` | location/country (e.g. `Colombia`) |
 | `--organization` | organization name |
 | `--compensation` `--currency` `--periodicity` | minimum compensation (currency default `USD$`, periodicity default `monthly`) |
+| `--since` / `--posted-after` | keep only roles created on/after a date — absolute `YYYY-MM-DD` or relative `Nd`/`Nw` (e.g. `7d`, `2w`). Client-side over `.created`; pairs well with `--all`/a larger `--limit` |
 | `--size` `--limit` `--all` | pagination |
 
 ## Output & scripting
