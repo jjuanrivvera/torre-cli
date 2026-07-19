@@ -8,6 +8,29 @@ All notable changes to this project are documented here. The format is based on
 
 ## [0.1.2] - 2026-07-19
 
+### Fixed
+- **`jobs search` pagination duplication** — `--limit N`/`--all` returned N rows but only a
+  single page's worth of UNIQUE ids (exactly 5× duplication at `--limit 100`). Root cause: the
+  opportunities `_search` endpoint **silently ignores the `offset` query parameter** (verified
+  live 2026-07-19: `offset=5` still returns `offset:0` and identical ids), so the offset loop
+  re-fetched page 1 every iteration. Fixed on two layers: (1) the paginator now requests the
+  largest single page the server allows (`size` capped at 99 — `size>=100` is rejected HTTP
+  400) instead of a dead offset walk, and stops as soon as a page yields no new id; (2) results
+  are **de-duplicated by `.id`** while accumulating, so the CLI never emits a duplicate
+  opportunity even if the server returns overlapping windows.
+
+### Added
+- `jobs search --location-type <value>` (repeatable/CSV) and `--remote-anywhere` — hard
+  client-side filters over each opportunity's `.place.locationType` (case-insensitive). For a
+  remote LATAM/Colombian contractor, `--remote-anywhere` (shorthand for
+  `--location-type remote_anywhere`) keeps only roles open to any country — a stronger quality
+  filter than the soft `--location` ranking hint. Opportunities with a missing/empty
+  locationType are dropped when the filter is active.
+- `jobs search --comp-disclosed-only` — hard client-side filter keeping only opportunities that
+  disclose a compensation figure (`.compensation.data.minAmount > 0` or `minHourlyUSD > 0`).
+  Distinct from the `--compensation` ranking hint. Both new filters compose (AND) with
+  `--since`, and — like `--since` — widen the scan when active without an explicit `--limit`.
+
 ### Changed
 - Docs: clarify that `jobs search --location` and `--compensation` (with `--currency`/
   `--periodicity`) are **server-side ranking hints, not hard filters** — Torre's `_search`

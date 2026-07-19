@@ -102,3 +102,81 @@ func TestFilterByCreated_ZeroThresholdNoOp(t *testing.T) {
 		t.Fatalf("zero threshold should return input unchanged, got %d", len(got))
 	}
 }
+
+// idsOf decodes the .id of each kept result into a set for assertions.
+func idsOf(t *testing.T, results []json.RawMessage) map[string]bool {
+	t.Helper()
+	ids := map[string]bool{}
+	for _, r := range results {
+		var env struct {
+			ID string `json:"id"`
+		}
+		if err := json.Unmarshal(r, &env); err != nil {
+			t.Fatalf("unmarshal kept result: %v", err)
+		}
+		ids[env.ID] = true
+	}
+	return ids
+}
+
+func TestFilterByLocationType(t *testing.T) {
+	results := []json.RawMessage{
+		json.RawMessage(`{"id":"anywhere","place":{"locationType":"remote_anywhere"}}`),
+		json.RawMessage(`{"id":"tz","place":{"locationType":"remote_timezones"}}`),
+		json.RawMessage(`{"id":"uppercase","place":{"locationType":"REMOTE_ANYWHERE"}}`),
+		json.RawMessage(`{"id":"onsite","place":{"locationType":"on_site"}}`),
+		json.RawMessage(`{"id":"emptytype","place":{"locationType":""}}`),
+		json.RawMessage(`{"id":"noplace"}`),
+	}
+	cases := []struct {
+		name   string
+		values []string
+		want   []string
+	}{
+		{"empty values is no-op", nil, []string{"anywhere", "tz", "uppercase", "onsite", "emptytype", "noplace"}},
+		{"blank-only values is no-op", []string{"", "  "}, []string{"anywhere", "tz", "uppercase", "onsite", "emptytype", "noplace"}},
+		{"single value case-insensitive", []string{"remote_anywhere"}, []string{"anywhere", "uppercase"}},
+		{"mixed case input", []string{"Remote_Anywhere"}, []string{"anywhere", "uppercase"}},
+		{"multiple values", []string{"remote_anywhere", "remote_timezones"}, []string{"anywhere", "tz", "uppercase"}},
+		{"no match", []string{"hybrid"}, []string{}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := idsOf(t, FilterByLocationType(results, tc.values))
+			if len(got) != len(tc.want) {
+				t.Fatalf("got %d results, want %d (%v)", len(got), len(tc.want), got)
+			}
+			for _, id := range tc.want {
+				if !got[id] {
+					t.Errorf("expected id %q to be kept", id)
+				}
+			}
+		})
+	}
+}
+
+func TestFilterByCompensationDisclosed(t *testing.T) {
+	results := []json.RawMessage{
+		json.RawMessage(`{"id":"range","compensation":{"data":{"minAmount":1200,"minHourlyUSD":7.5}}}`),
+		json.RawMessage(`{"id":"hourly-only","compensation":{"data":{"minAmount":0,"minHourlyUSD":10}}}`),
+		json.RawMessage(`{"id":"amount-only","compensation":{"data":{"minAmount":3000,"minHourlyUSD":0}}}`),
+		json.RawMessage(`{"id":"zero","compensation":{"data":{"minAmount":0,"minHourlyUSD":0}}}`),
+		json.RawMessage(`{"id":"null-data","compensation":{"data":null}}`),
+		json.RawMessage(`{"id":"no-comp"}`),
+	}
+	got := idsOf(t, FilterByCompensationDisclosed(results))
+	want := []string{"range", "hourly-only", "amount-only"}
+	if len(got) != len(want) {
+		t.Fatalf("got %d results, want %d (%v)", len(got), len(want), got)
+	}
+	for _, id := range want {
+		if !got[id] {
+			t.Errorf("expected disclosed id %q to be kept", id)
+		}
+	}
+	for _, id := range []string{"zero", "null-data", "no-comp"} {
+		if got[id] {
+			t.Errorf("undisclosed id %q must be dropped", id)
+		}
+	}
+}

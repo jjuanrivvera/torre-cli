@@ -64,6 +64,13 @@ torre jobs search --skill "product design" --location Colombia --limit 50 -o id
 torre jobs search --skill golang --since 7d --all -o json
 torre jobs search --skill golang --posted-after 2026-07-12 -o json
 
+# Remote roles open to ANY country (the key filter for a LATAM contractor)
+torre jobs search --skill golang --remote-anywhere --limit 100 -o id
+torre jobs search --skill golang --location-type remote_anywhere,remote_timezones -o json
+
+# Only roles that actually disclose pay, posted in the last two weeks
+torre jobs search --skill golang --comp-disclosed-only --since 14d -o json
+
 # One opportunity's full detail
 torre jobs get KWN4QjAd
 
@@ -86,12 +93,21 @@ torre people search --skill "data science" --remote -o table
 | `--organization` | organization name |
 | `--compensation` `--currency` `--periodicity` | compensation ranking hint (currency default `USD$`, periodicity default `monthly`) — server-side relevance nudge, **not** a hard filter |
 | `--since` / `--posted-after` | keep only roles created on/after a date — absolute `YYYY-MM-DD` or relative `Nd`/`Nw` (e.g. `7d`, `2w`). Client-side over `.created`; pairs well with `--all`/a larger `--limit` |
+| `--location-type` | hard client-side filter on `.place.locationType` (repeatable/CSV, case-insensitive; e.g. `remote_anywhere`, `remote_timezones`) |
+| `--remote-anywhere` | shorthand for `--location-type remote_anywhere` — roles open to any country (the key filter for a remote LATAM contractor) |
+| `--comp-disclosed-only` | hard client-side filter: keep only roles that disclose a pay figure (`minAmount>0` or `minHourlyUSD>0`) — distinct from the `--compensation` ranking hint |
 | `--size` `--limit` `--all` | pagination |
 
 > Note: `--location` and `--compensation` are **ranking hints** Torre applies server-side — they
 > influence relevance/ordering but do NOT restrict results to that location or pay (a remote role
-> carries no location and is not dropped). Only `--skill` narrows the search and `--since` is a
-> hard (client-side) filter.
+> carries no location and is not dropped). The **hard** (client-side) filters are `--since`,
+> `--location-type`/`--remote-anywhere`, and `--comp-disclosed-only`; they compose (AND) and only
+> `--skill` narrows the server-side search.
+>
+> Pagination note: the opportunities `_search` endpoint ignores `offset` and caps a page at 99,
+> so `--limit`/`--all` fetch one large page and de-duplicate by `.id` — the earlier bug where
+> `--limit 100` returned 100 rows but only ~20 unique ids is fixed. The distinct maximum from
+> this endpoint is ~99.
 
 ## Output & scripting
 

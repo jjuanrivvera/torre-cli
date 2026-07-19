@@ -101,6 +101,39 @@ OpenAPI/llms.txt/Postman collection, so the surface was enumerated by request).
     compensation is frequently unset/"to-be-agreed" (would drop most results). Contrast with
     `--since` (#13), which IS an honest hard client-side filter over `.created`.
 
+## Pagination reality & the duplication fix
+
+17. **Opportunities `_search` IGNORES `offset`; pagination is via `size` only, capped at 99**
+    → the paginator fetches ONE large page (size = demand, bounded at 99) and de-duplicates by
+    `.id`, rather than walking `offset`. Why: verified live 2026-07-19 that the endpoint
+    silently ignores `offset` — `?size=5&offset=5` returns `offset:0` and the SAME 5 ids as
+    `offset=0` (and `from`/`page`/body-`offset` are equally ignored). The old loop advanced
+    `offset` in the query string, but since the server never honored it, every page re-fetched
+    page 1, so `--limit 100` accumulated the same 20 rows 5× (the "5× duplicate" bug). Only
+    `size` moves the window, and `size>=100` is rejected `HTTP 400 "Request size too large"`, so
+    99 is the ceiling. Consequence: the maximum UNIQUE opportunities obtainable from this
+    endpoint is ~99 — `--limit 100` returns 99 distinct (or fewer if fewer match), never 100.
+    The paginator still advances `offset` defensively (forward-compatible if Torre ever fixes
+    it) but stops the moment a page contributes no new id, and a `.id` seen-set guarantees no
+    duplicate is ever emitted regardless of server behavior. People `_search` likely shares the
+    quirk but is out of scope for this fix.
+
+## Location-type / compensation-disclosed hard filters
+
+18. **`.place.locationType` is the meaningful remote filter (a hard client-side filter)** →
+    `--location-type`/`--remote-anywhere` filter the fetched set on `.place.locationType`
+    (values `remote_anywhere`, `remote_timezones`, …), and `--comp-disclosed-only` keeps only
+    rows with a positive `.compensation.data.minAmount`/`minHourlyUSD`. Why: verified live
+    2026-07-19 that a remote opportunity carries a structured `place.locationType` even though
+    its `locations` array is empty — so unlike `--location` (#16, a server-side ranking hint
+    that can't honestly filter remote roles), `locationType` IS an honest hard filter. For a
+    remote LATAM contractor, `remote_anywhere` (open to any country) is the key quality signal.
+    These filters are client-side (like `--since` #13), compose (AND) with `--since`, DROP rows
+    with a missing/empty value when active, and widen the scan (#14) when active without an
+    explicit `--limit`/`--all`. `--comp-disclosed-only` is separate from the `--compensation`
+    ranking hint: most opps leave pay undisclosed (`compensation.data` null or min == 0), so
+    this is opt-in.
+
 ## Completeness
 
 - `api_method_total = 4` is the full enumerated public unauthenticated surface (see

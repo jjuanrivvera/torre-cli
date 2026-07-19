@@ -123,31 +123,72 @@ func (c *Client) SearchOpportunities(ctx context.Context, f SearchFilters, size,
 	return &resp, raw, nil
 }
 
-// SearchOpportunitiesAll walks pages by advancing offset until `limit` results are collected
-// (limit<=0 means one page). It is bounded by the server's reported total and a hard page cap.
+// maxOpportunityPageSize is the largest `size` the opportunities _search cluster accepts;
+// size>=100 is rejected with HTTP 400 "Request size too large". Verified live 2026-07-19
+// (DECISIONS.md #17).
+const maxOpportunityPageSize = 99
+
+// SearchOpportunitiesAll collects up to `limit` DISTINCT opportunities (limit<=0 && !all
+// means one page). Two Torre realities shape this (DECISIONS.md #17, verified live
+// 2026-07-19):
+//
+//  1. The opportunities _search endpoint SILENTLY IGNORES the `offset` query param — every
+//     request returns `offset:0`, so a naive offset loop re-fetches page 1 each iteration and
+//     emits the same rows N times (the "5x duplicate" bug). The only lever that works is
+//     `size`, capped at 99. So the page is sized to the demand (bounded by the cap) and, if
+//     the server ever honors offset again, the loop still advances it.
+//  2. As a hard safety net, results are de-duplicated by `.id` while accumulating, so the CLI
+//     never emits a duplicate opportunity even if the server returns overlapping windows.
 func (c *Client) SearchOpportunitiesAll(ctx context.Context, f SearchFilters, size, limit int, all bool) ([]json.RawMessage, error) {
 	const pageCap = 100
 	if size <= 0 {
 		size = 20
 	}
+	// Because offset paging is a no-op on this endpoint, the only way to surface more than
+	// one response's worth of results is a single larger page. Size it to the demand.
+	pageSize := size
+	switch {
+	case all:
+		pageSize = maxOpportunityPageSize
+	case limit > pageSize:
+		pageSize = limit
+	}
+	if pageSize > maxOpportunityPageSize {
+		pageSize = maxOpportunityPageSize
+	}
+
+	seen := make(map[string]struct{})
 	var out []json.RawMessage
 	offset := 0
-	for page := 0; ; page++ {
-		if page >= pageCap {
-			return out, fmt.Errorf("stopped after %d pages — narrow the query or use --limit", pageCap)
-		}
-		resp, _, err := c.SearchOpportunities(ctx, f, size, offset)
+	for page := 0; page < pageCap; page++ {
+		resp, _, err := c.SearchOpportunities(ctx, f, pageSize, offset)
 		if err != nil {
 			return nil, err
 		}
 		if resp == nil { // dry-run prints the first request only
 			return nil, nil
 		}
-		out = append(out, resp.Results...)
-		if limit > 0 && len(out) >= limit {
-			return out[:limit], nil
+		added := 0
+		for _, r := range resp.Results {
+			if id := opportunityID(r); id != "" {
+				if _, dup := seen[id]; dup {
+					continue // dedup safety net
+				}
+				seen[id] = struct{}{}
+			}
+			out = append(out, r)
+			added++
+			if limit > 0 && len(out) >= limit {
+				return out, nil
+			}
 		}
-		if len(resp.Results) == 0 || offset+len(resp.Results) >= resp.Total {
+		// A page that adds nothing new means the server has no more DISTINCT results to
+		// give (an offset-ignoring server just repeated its first page) — stop instead of
+		// spinning to the page cap.
+		if added == 0 || len(resp.Results) == 0 {
+			return out, nil
+		}
+		if offset+len(resp.Results) >= resp.Total {
 			return out, nil
 		}
 		if !all && limit == 0 {
@@ -155,6 +196,19 @@ func (c *Client) SearchOpportunitiesAll(ctx context.Context, f SearchFilters, si
 		}
 		offset += len(resp.Results)
 	}
+	return out, fmt.Errorf("stopped after %d pages — narrow the query or use --limit", pageCap)
+}
+
+// opportunityID extracts an opportunity's `.id` for de-duplication. A result with no id (or
+// an unparseable one) yields "" and is never treated as a duplicate.
+func opportunityID(raw json.RawMessage) string {
+	var env struct {
+		ID ID `json:"id"`
+	}
+	if err := json.Unmarshal(raw, &env); err != nil {
+		return ""
+	}
+	return env.ID.String()
 }
 
 // GetOpportunity fetches one opportunity's full detail from the app API.

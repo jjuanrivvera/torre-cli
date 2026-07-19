@@ -34,6 +34,9 @@ func init() {
 func newJobsSearchCmd(d *deps) *cobra.Command {
 	var f api.SearchFilters
 	var since string
+	var locationTypes []string
+	var remoteAnywhere bool
+	var compDisclosedOnly bool
 	cmd := &cobra.Command{
 		Use:   "search",
 		Short: "Search job opportunities",
@@ -42,10 +45,16 @@ compensation filters. Results paginate with --size/--limit/--all. Machine output
 (-o json/-o id/--jq) is the primary interface for an assistant; -o table is the human view.
 
 Not every flag narrows the result set. --skill (and --experience) narrows the search, and
---since (alias --posted-after) is a hard client-side date filter. But --location and
---compensation (with --currency/--periodicity) are RANKING HINTS Torre applies server-side:
-they nudge relevance/ordering, they do NOT restrict results to that location or pay. A remote
-role, for example, carries no location and is not dropped by --location.
+--since (alias --posted-after), --location-type/--remote-anywhere and --comp-disclosed-only
+are hard client-side filters. But --location and --compensation (with --currency/--periodicity)
+are RANKING HINTS Torre applies server-side: they nudge relevance/ordering, they do NOT
+restrict results to that location or pay. A remote role, for example, carries no location and
+is not dropped by --location.
+
+For a remote contractor, --remote-anywhere (shorthand for --location-type remote_anywhere)
+keeps only roles open to any country — a stronger quality filter than the soft --location.
+--comp-disclosed-only drops opportunities that hide their pay. Both compose (AND) with --since
+over the correctly-paginated, de-duplicated result set.
 
 A skill search needs an experience level (Torre rejects a bare skill); --experience defaults
 to "potential-to-develop" and accepts Torre's levels such as "1-plus-years",
@@ -58,6 +67,9 @@ pair --since with --all or a larger --limit; when neither is set --since widens 
 		Example: `  torre jobs search --skill golang --remote
   torre jobs search --skill "product design" --location Colombia --limit 50 -o json
   torre jobs search --skill go --since 7d --remote -o json
+  torre jobs search --skill go --remote-anywhere --limit 100 -o id
+  torre jobs search --skill go --location-type remote_anywhere,remote_timezones -o json
+  torre jobs search --skill go --comp-disclosed-only --since 14d -o json
   torre jobs search --skill go --posted-after 2026-07-12 --all -o id
   torre jobs search --skill go --compensation 3000 --currency 'USD$' --periodicity monthly`,
 		Args: cobra.NoArgs,
@@ -73,11 +85,17 @@ pair --since with --all or a larger --limit; when neither is set --since widens 
 				if err != nil {
 					return err
 				}
-				// Relevance-ordered results bury recent items; widen the scan when a date
-				// is pinned but the user gave no explicit --limit and didn't ask for --all.
-				if !cmd.Flags().Changed("limit") && !d.gf.all {
-					limit = sinceDefaultScan
-				}
+			}
+			if remoteAnywhere {
+				locationTypes = append(locationTypes, "remote_anywhere")
+			}
+			// Every client-side filter (since, location-type, comp-disclosed) narrows a
+			// relevance-ordered set where matching items are sparse; widen the scan when a
+			// filter is active but the user gave no explicit --limit and didn't ask for --all
+			// (DECISIONS.md #14, #18).
+			clientFilterActive := since != "" || len(locationTypes) > 0 || compDisclosedOnly
+			if clientFilterActive && !cmd.Flags().Changed("limit") && !d.gf.all {
+				limit = sinceDefaultScan
 			}
 			results, err := c.SearchOpportunitiesAll(cmd.Context(), f, size, limit, d.gf.all)
 			if err != nil {
@@ -88,6 +106,12 @@ pair --since with --all or a larger --limit; when neither is set --since widens 
 			}
 			if since != "" {
 				results = api.FilterByCreated(results, threshold)
+			}
+			if len(locationTypes) > 0 {
+				results = api.FilterByLocationType(results, locationTypes)
+			}
+			if compDisclosedOnly {
+				results = api.FilterByCompensationDisclosed(results)
 			}
 			return d.render(cmd, marshalList(results), jobsColumns)
 		},
@@ -106,6 +130,9 @@ pair --since with --all or a larger --limit; when neither is set --since widens 
 	fl.StringVar(&since, "since", "", "keep only opportunities created on/after this date: absolute YYYY-MM-DD or relative Nd/Nw (e.g. 7d, 2w)")
 	fl.StringVar(&since, "posted-after", "", "alias for --since")
 	_ = fl.MarkHidden("posted-after")
+	fl.StringSliceVar(&locationTypes, "location-type", nil, "hard client-side filter: keep only opportunities whose .place.locationType matches (case-insensitive, repeatable/CSV; e.g. remote_anywhere,remote_timezones)")
+	fl.BoolVar(&remoteAnywhere, "remote-anywhere", false, "shorthand for --location-type remote_anywhere (roles open to any country — the key filter for a remote LATAM contractor)")
+	fl.BoolVar(&compDisclosedOnly, "comp-disclosed-only", false, "hard client-side filter: keep only opportunities that disclose a compensation figure (minAmount>0 or minHourlyUSD>0); distinct from the --compensation ranking hint")
 	return annotate(cmd, kindRead)
 }
 

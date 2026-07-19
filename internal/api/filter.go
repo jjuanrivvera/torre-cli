@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -70,6 +71,83 @@ func FilterByCreated(results []json.RawMessage, threshold time.Time) []json.RawM
 			continue
 		}
 		if !t.Before(threshold) {
+			kept = append(kept, r)
+		}
+	}
+	return kept
+}
+
+// placeEnvelope pulls just the place.locationType out of an opportunity result. Torre models
+// a remote role's openness here: `remote_anywhere` (open to any country) vs
+// `remote_timezones` (restricted to timezone bands), etc.
+type placeEnvelope struct {
+	Place struct {
+		LocationType string `json:"locationType"`
+	} `json:"place"`
+}
+
+// FilterByLocationType keeps only the results whose `.place.locationType` matches one of the
+// given values (case-insensitive). An empty `values` slice is a no-op. Because the point of
+// the filter is "this role is open to my situation", a result with a missing or empty
+// locationType is DROPPED when the filter is active (it can't be verified to match). This is
+// an honest hard client-side filter — unlike the server-side `--location` ranking hint
+// (DECISIONS.md #16, #18).
+func FilterByLocationType(results []json.RawMessage, values []string) []json.RawMessage {
+	if len(values) == 0 {
+		return results
+	}
+	want := make(map[string]struct{}, len(values))
+	for _, v := range values {
+		v = strings.ToLower(strings.TrimSpace(v))
+		if v != "" {
+			want[v] = struct{}{}
+		}
+	}
+	if len(want) == 0 {
+		return results
+	}
+	kept := make([]json.RawMessage, 0, len(results))
+	for _, r := range results {
+		var env placeEnvelope
+		if err := json.Unmarshal(r, &env); err != nil {
+			continue
+		}
+		lt := strings.ToLower(strings.TrimSpace(env.Place.LocationType))
+		if lt == "" {
+			continue
+		}
+		if _, ok := want[lt]; ok {
+			kept = append(kept, r)
+		}
+	}
+	return kept
+}
+
+// compEnvelope pulls just the disclosed compensation figures out of an opportunity result.
+// Most Torre opportunities leave compensation undisclosed (`.compensation.data` null, or the
+// min figures zero); a disclosed one carries a positive minAmount or minHourlyUSD.
+type compEnvelope struct {
+	Compensation struct {
+		Data *struct {
+			MinAmount    float64 `json:"minAmount"`
+			MinHourlyUSD float64 `json:"minHourlyUSD"`
+		} `json:"data"`
+	} `json:"compensation"`
+}
+
+// FilterByCompensationDisclosed keeps only the results that actually disclose a compensation
+// figure (a positive minAmount OR minHourlyUSD). This is distinct from the server-side
+// `--compensation` ranking hint (DECISIONS.md #16): that nudges ordering, this drops rows
+// whose pay is undisclosed/zero. An item with no compensation data is dropped.
+func FilterByCompensationDisclosed(results []json.RawMessage) []json.RawMessage {
+	kept := make([]json.RawMessage, 0, len(results))
+	for _, r := range results {
+		var env compEnvelope
+		if err := json.Unmarshal(r, &env); err != nil {
+			continue
+		}
+		d := env.Compensation.Data
+		if d != nil && (d.MinAmount > 0 || d.MinHourlyUSD > 0) {
 			kept = append(kept, r)
 		}
 	}

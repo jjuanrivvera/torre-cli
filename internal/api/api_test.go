@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -84,6 +85,104 @@ func TestSearchOpportunitiesAll_Paginates(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, got, 3)
 	assert.Equal(t, 2, calls)
+}
+
+// TestSearchOpportunitiesAll_DistinctPages proves that when the server honors offset and
+// serves distinct windows, --limit N returns N DISTINCT ids across pages (no truncation, no
+// duplicates). The fake caps each response below the requested page size to force iteration.
+func TestSearchOpportunitiesAll_DistinctPages(t *testing.T) {
+	const perPage, total = 3, 30
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		off, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+		var ids []string
+		for i := off; i < off+perPage && i < total; i++ {
+			ids = append(ids, fmt.Sprintf(`{"id":"opp-%d"}`, i))
+		}
+		_, _ = fmt.Fprintf(w, `{"total":%d,"size":%d,"offset":%d,"results":[%s]}`,
+			total, perPage, off, strings.Join(ids, ","))
+	})
+	got, err := c.SearchOpportunitiesAll(t.Context(), SearchFilters{}, perPage, 10, true)
+	require.NoError(t, err)
+	assert.Len(t, got, 10, "--limit 10 must return exactly 10")
+	assert.Equal(t, 10, countUniqueIDs(t, got), "all 10 ids must be distinct")
+}
+
+// TestSearchOpportunitiesAll_DedupsOverlap proves the safety-net: even when the server returns
+// overlapping windows (the same id in consecutive pages), the accumulated set is de-duplicated
+// by .id.
+func TestSearchOpportunitiesAll_DedupsOverlap(t *testing.T) {
+	// Each page shares its last id with the next page's first id (a 1-item overlap).
+	pages := map[string]string{
+		"0": `{"total":10,"size":3,"offset":0,"results":[{"id":"a"},{"id":"b"},{"id":"c"}]}`,
+		"3": `{"total":10,"size":3,"offset":3,"results":[{"id":"c"},{"id":"d"},{"id":"e"}]}`,
+		"6": `{"total":10,"size":3,"offset":6,"results":[{"id":"e"},{"id":"f"}]}`,
+	}
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		off := r.URL.Query().Get("offset")
+		body, ok := pages[off]
+		if !ok {
+			body = `{"total":10,"size":3,"offset":9,"results":[]}`
+		}
+		_, _ = w.Write([]byte(body))
+	})
+	got, err := c.SearchOpportunitiesAll(t.Context(), SearchFilters{}, 3, 0, true)
+	require.NoError(t, err)
+	// a,b,c,d,e,f = 6 unique despite c and e appearing twice on the wire.
+	assert.Equal(t, 6, len(got))
+	assert.Equal(t, 6, countUniqueIDs(t, got), "overlapping ids must be de-duplicated")
+}
+
+// TestSearchOpportunitiesAll_OffsetIgnored_NoDuplicates reproduces the real Torre bug: the
+// server ignores offset and returns the SAME page every request. --limit 100 must yield the
+// page's distinct ids ONCE (not 5x duplicated), and the loop must stop instead of spinning to
+// the page cap.
+func TestSearchOpportunitiesAll_OffsetIgnored_NoDuplicates(t *testing.T) {
+	var calls int
+	c := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		calls++ // offset deliberately ignored — always page 1
+		var ids []string
+		for i := 0; i < 20; i++ {
+			ids = append(ids, fmt.Sprintf(`{"id":"job-%d"}`, i))
+		}
+		_, _ = fmt.Fprintf(w, `{"total":646,"size":20,"offset":0,"results":[%s]}`, strings.Join(ids, ","))
+	})
+	got, err := c.SearchOpportunitiesAll(t.Context(), SearchFilters{}, 20, 100, false)
+	require.NoError(t, err)
+	assert.Equal(t, 20, len(got), "an offset-ignoring server yields only its 20 distinct rows")
+	assert.Equal(t, 20, countUniqueIDs(t, got), "no duplicates despite the server repeating page 1")
+	assert.LessOrEqual(t, calls, 2, "loop must stop once a page adds nothing new, not spin to the cap")
+}
+
+// TestSearchOpportunitiesAll_CapsPageSize proves the requested page size never exceeds the
+// server's max of 99 (size>=100 => HTTP 400 on the real endpoint).
+func TestSearchOpportunitiesAll_CapsPageSize(t *testing.T) {
+	var maxSeen int
+	c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		s, _ := strconv.Atoi(r.URL.Query().Get("size"))
+		if s > maxSeen {
+			maxSeen = s
+		}
+		_, _ = w.Write([]byte(`{"total":5,"size":99,"offset":0,"results":[{"id":"a"},{"id":"b"},{"id":"c"},{"id":"d"},{"id":"e"}]}`))
+	})
+	_, err := c.SearchOpportunitiesAll(t.Context(), SearchFilters{}, 20, 1000, false)
+	require.NoError(t, err)
+	assert.LessOrEqual(t, maxSeen, 99, "must never request size>=100")
+}
+
+// countUniqueIDs decodes each result's .id and returns the count of distinct non-empty ids.
+func countUniqueIDs(t *testing.T, results []json.RawMessage) int {
+	t.Helper()
+	seen := map[string]struct{}{}
+	for _, r := range results {
+		var env struct {
+			ID string `json:"id"`
+		}
+		require.NoError(t, json.Unmarshal(r, &env))
+		if env.ID != "" {
+			seen[env.ID] = struct{}{}
+		}
+	}
+	return len(seen)
 }
 
 func TestSearchOpportunitiesAll_LimitCaps(t *testing.T) {
