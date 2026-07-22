@@ -1,8 +1,6 @@
 module github.com/jjuanrivvera/torre-cli
 
-go 1.25.5
-
-toolchain go1.25.12
+go 1.25.12
 
 require (
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
