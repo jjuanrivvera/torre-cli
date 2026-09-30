@@ -15,6 +15,9 @@
 
 [Documentation](https://jjuanrivvera.github.io/torre-cli/) · [Command reference](https://jjuanrivvera.github.io/torre-cli/commands/torre/)
 
+
+![torre in action](assets/demo.gif)
+
 </div>
 
 A fast, scriptable, **agent-friendly** command-line client for the [Torre.ai](https://torre.ai)
